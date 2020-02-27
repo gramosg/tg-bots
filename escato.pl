@@ -13,8 +13,8 @@ my $text = <>;
 
 # Indicios de que alguien ha cagado
 my @DUMP_TRIGGERS = (
-    "caga", "jiñ", # Verbos
-    "pino", "pinaco", "ñordo", "truñ", "chusc", "caca" # Sustantivos
+    "caga", "jiñ", "vientr", # Verbos
+    "pino", "pinaco", "ñordo", "truñ", "chusc", "caca", "mierda" # Sustantivos
     );
 my @PHRASES = (
     "Estoy orgulloso de ti, %s.",
@@ -24,10 +24,12 @@ my @PHRASES = (
 my $dbh;
 
 init_schema() unless -f 'escato.db';
-if (any { lc($text) =~ $_ } @DUMP_TRIGGERS) {
-    save_dump();
-} elsif (lc($text) =~ /^\@escatobot/) {
-    show_dumps();
+if (lc($text) =~ /^\@escatobot/) {
+    if (any { lc($text) =~ $_ } @DUMP_TRIGGERS) {
+        save_dump();
+    } else {
+        show_dumps();
+    }
 }
 
 sub show_dumps {
@@ -41,7 +43,7 @@ sub show_dumps {
         $hour > 13 ? "Hola, buenas tardes. " :
         "Hola, buenos días. ";
 
-    if ($tg_chat_id ne $tg_id) {
+    if ($tg_chat_id eq $tg_id) {
         my ($month, $year) =
             @{tg_id_dumps($tg_id)}{'month', 'year'};
 
@@ -54,7 +56,7 @@ sub show_dumps {
             push @shures, {username => $shur->{'username'},
                            data => tg_id_dumps($shur->{'id'})};
         }
-        foreach my $shur (sort { $_->{data}{month} } @shures) {
+        foreach my $shur (sort { $b->{data}{month} cmp $a->{data}{month} } @shures) {
             printf "%d - @%s ha cagado %d veces este mes, y %d al año.\n",
                 $position++, $shur->{username}, $shur->{data}{month}, $shur->{data}{year};
         }
