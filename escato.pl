@@ -13,8 +13,10 @@ my $text = <>;
 
 # Indicios de que alguien ha cagado
 my @DUMP_TRIGGERS = (
-    "caga", "jiñ", "vientr", # Verbos
-    "pino", "pinaco", "ñordo", "truñ", "chusc", "caca", "mierda" # Sustantivos
+    "caga", "cagu", "jiñ", "vientr", "plant", "deposit", "bomb", "defec", # Verbos
+    "pino", "pinaco", "ñordo", "truñ", "chusc", "caca", "caco", "baño",
+    "mierda", "topo", "mojón", "zurullo", "wc", "roca", "retrete", # Sustantivos
+    "a gust" # Otros
     );
 my @PHRASES = (
     "Estoy orgulloso de ti, %s.",
