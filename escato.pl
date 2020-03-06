@@ -56,7 +56,7 @@ sub show_dumps {
             push @shures, {username => $shur->{'username'},
                            data => tg_id_dumps($shur->{'id'})};
         }
-        foreach my $shur (sort { $b->{data}{month} cmp $a->{data}{month} } @shures) {
+        foreach my $shur (sort { $b->{data}{month} <=> $a->{data}{month} } @shures) {
             printf "%d - @%s ha cagado %d veces este mes, y %d al año.\n",
                 $position++, $shur->{username}, $shur->{data}{month}, $shur->{data}{year};
         }
