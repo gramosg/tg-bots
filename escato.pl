@@ -24,7 +24,9 @@ my @PHRASES = (
 my $dbh;
 
 init_schema() unless -f 'escato.db';
-if (lc($text) =~ /^\@escatobot/) {
+my ($tg_chat_id, $tg_id, $tg_username) =
+    @ENV{'TGUTILS_CHAT_ID', 'TGUTILS_FROM_ID', 'TGUTILS_FROM_USERNAME'};
+if ($tg_chat_id eq $tg_id || lc($text) =~ /^\@escatobot/) {
     if (any { lc($text) =~ $_ } @DUMP_TRIGGERS) {
         save_dump();
     } else {
@@ -33,8 +35,6 @@ if (lc($text) =~ /^\@escatobot/) {
 }
 
 sub show_dumps {
-    my ($tg_chat_id, $tg_id, $tg_username) =
-        @ENV{'TGUTILS_CHAT_ID', 'TGUTILS_FROM_ID', 'TGUTILS_FROM_USERNAME'};
     $dbh ||= DBI->connect("DBI:SQLite:dbname=escato.db", { AutoCommit => 0, RaiseError => 1 });
 
     my ($sec, $min, $hour) = localtime();
@@ -77,19 +77,21 @@ sub tg_id_dumps {
 
     $dbh ||= DBI->connect("DBI:SQLite:dbname=escato.db", { AutoCommit => 0, RaiseError => 1 });
 
-    my $sth = $dbh->prepare('SELECT day, count FROM monthly_dumps WHERE tg_id = ?');
+    my $sth = $dbh->prepare('SELECT date FROM monthly_dumps WHERE tg_id = ?');
     $sth->execute($tg_id);
-    my %stats = (total => 0, year => 0, month => 0, day => 0);
+    my @points;
+    my %stats = (points => \@points, total => 0, year => 0, month => 0, day => 0);
     my (undef, undef, undef, $day, $month, $year) = localtime();
     $month++;
     $year += 1900;
     while (my $row = $sth->fetch()) {
-        my ($date, $count) = @$row;
+        push @points, $row;
+        my ($date) = @$row;
         my ($y, $m, $d) = $date =~ /(\d+)-(\d+)-(\d+)/;
-        $stats{total} += $count;
-        $stats{year} += $count if $y == $year;
-        $stats{month} += $count if $m == $month;
-        $stats{day} += $count if $d == $day;
+        $stats{total} += 1;
+        $stats{year} += 1 if $y == $year;
+        $stats{month} += 1 if $m == $month;
+        $stats{day} += 1 if $d == $day;
     }
     \%stats;
 }
@@ -113,16 +115,12 @@ sub init_schema {
     $dbh->prepare('CREATE TABLE monthly_dumps (
                  id INTEGER PRIMARY KEY,
                  tg_id INTEGER NOT NULL,
-                 day DATE NOT NULL,
-                 count INTEGER NOT NULL,
+                 date DATE NOT NULL,
                  FOREIGN KEY (tg_id) REFERENCES tg_users(id)
-                 UNIQUE(tg_id, day)
                  )')->execute();
 }
 
 sub save_dump {
-    my ($tg_chat_id, $tg_id, $tg_username) = @ENV{'TGUTILS_CHAT_ID', 'TGUTILS_FROM_ID', 'TGUTILS_FROM_USERNAME'};
-
     $dbh ||= DBI->connect("DBI:SQLite:dbname=escato.db", { AutoCommit => 0, RaiseError => 1 });
     $dbh->prepare('INSERT OR REPLACE INTO tg_users VALUES (?, ?)')
         ->execute($tg_id, $tg_username);
@@ -131,20 +129,15 @@ sub save_dump {
     $dbh->prepare('INSERT OR IGNORE INTO tg_chat_users VALUES (?, ?)')
         ->execute($tg_chat_id, $tg_id);
 
-    my $sth = $dbh->prepare('SELECT count FROM monthly_dumps
-                           WHERE tg_id = ? AND day = DATE("now", "start of day")');
-    $sth->execute($tg_id);
-    if ($sth->fetch()) {
-        $dbh
-            ->prepare('UPDATE monthly_dumps SET count = count+1 WHERE
-                     tg_id = ? AND day = DATE("now", "start of day")')
-            ->execute($tg_id);
-    } else {
-        $dbh->prepare('INSERT INTO monthly_dumps
-                     (tg_id, day, count)
-                     VALUES
-                     (?, DATE("now", "start of day"), 1)')->execute($tg_id);
+    $dbh->prepare('INSERT INTO monthly_dumps
+                 (tg_id, date)
+                 VALUES
+                 (?, DATETIME("now"))')->execute($tg_id);
+    my (undef, undef, undef, $mday, $mon) = localtime();
+    my $phrase = sprintf $PHRASES[rand @PHRASES], "@" . $tg_username;
+    if ($mday == 9 && $mon == 2) {
+        $phrase =~ s/o([a-z]?([^a-z]|$))/e$1/g;
     }
-    printf $PHRASES[rand @PHRASES], "@" . $tg_username;
+    print $phrase;
 }
 
