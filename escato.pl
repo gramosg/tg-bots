@@ -13,15 +13,20 @@ my $text = <>;
 
 # Indicios de que alguien ha cagado
 my @DUMP_TRIGGERS = (
-    "caga", "cagu", "jiñ", "vientr", "plant", "deposit", "bomb", "defec", # Verbos
-    "pino", "pinaco", "ñordo", "truñ", "chusc", "caca", "caco", "baño",
-    "mierda", "topo", "mojón", "zurullo", "wc", "roca", "retrete", # Sustantivos
-    "a gust" # Otros
+    "caga", "cagu", "jiñ", "vientr", "plant", "deposit", "bomb", "defec",
+    "apunt", # Verbos
+    "tremend[ao]", "salvaj", # Adjetivos
+    "pino", "pinaco", "ñordo", "truñ", "chusc", "caca", "caco", "caqu", "baño",
+    "mierda", "topo", "mojón", "zurull", "wc", "roca", "retrete", "shit", # Sustantivos
+    "a gust", "otr[ao]", "💩" # Otros
     );
 my @PHRASES = (
     "Estoy orgulloso de ti, %s.",
     "¡Así se hace %s! 👏👏",
     "¿Otra vez, %s? Tu salud intestinal es admirable, felicidades.",
+    "Te habrás quedado a gusto.",
+    "Sigue así %s, mostro, titán, coloso, crack, máquina, mastodonte, huracán.",
+    "%s Oh capitán, mi capitán.",
     );
 my $dbh;
 
@@ -58,11 +63,16 @@ sub show_dumps {
             push @shures, {username => $shur->{'username'},
                            data => tg_id_dumps($shur->{'id'})};
         }
+        my $graph = gen_graph(map { $_->{points} } @shures);
         foreach my $shur (sort { $b->{data}{month} <=> $a->{data}{month} } @shures) {
             printf "%d - @%s ha cagado %d veces este mes, y %d al año.\n",
                 $position++, $shur->{username}, $shur->{data}{month}, $shur->{data}{year};
         }
     }
+}
+
+sub gen_graph {
+    my $points = shift;
 }
 
 sub chat_members {
@@ -137,7 +147,7 @@ sub save_dump {
                  (?, DATETIME("now"))')->execute($tg_id);
     my (undef, undef, undef, $mday, $mon) = localtime();
     my $phrase = sprintf $PHRASES[rand @PHRASES], "@" . $tg_username;
-    if ($mday == 9 && $mon == 2) {
+    if ($mday == 8 && $mon == 2) {
         $phrase =~ s/o([a-z]?([^a-z]|$))/e$1/g;
     }
     print $phrase;
