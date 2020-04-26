@@ -36,4 +36,6 @@ close $newh;
 
 unlink $origpath, $newpath;
 
-print encode_json({type => 'DOCUMENT', caption => 'Tenga, ayúdese', content => encode_base64 $newimg, '' });
+print encode_json({type => 'DOCUMENT', caption => 'Tenga, ayúdese',
+                   content => encode_base64 $newimg, '',
+                   filename => 'cosa.png'});
