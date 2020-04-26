@@ -4,6 +4,10 @@ use strict;
 use warnings;
 use List::Util qw<any>;
 use DBI;
+use GD::Graph;
+use GD::Graph::lines;
+use JSON qw<encode_json>;
+use MIME::Base64 qw<encode_base64>;
 
 exit unless exists $ENV{'TGUTILS_TYPE'};
 exit unless $ENV{'TGUTILS_TYPE'} eq 'TEXT';
@@ -45,34 +49,71 @@ sub show_dumps {
     $dbh ||= DBI->connect("DBI:SQLite:dbname=escato.db", { AutoCommit => 0, RaiseError => 1 });
 
     my ($sec, $min, $hour) = localtime();
-    print
+    my $out;
+    my $graph_b64;
+
+    $out .= sprintf
         $hour < 4 || $hour > 20 ? "Hola, buenas noches. " :
         $hour > 13 ? "Hola, buenas tardes. " :
         "Hola, buenos días. ";
 
     if ($tg_chat_id eq $tg_id) {
-        my ($month, $year) =
-            @{tg_id_dumps($tg_id)}{'month', 'year'};
+        my ($month, $year, $points) =
+            @{tg_id_dumps($tg_id)}{'month', 'year', 'points'};
 
-        print "Te cuento, $tg_username. Este mes has cagado $month veces. En total llevas $year truños en lo que vamos de año.\n";
+        $out .= sprintf "Te cuento, $tg_username. Este mes has cagado $month veces. En total llevas $year truños en lo que vamos de año.\n";
+        $graph_b64 = gen_graph({$tg_username => $points});
     } else {
-        print "Os cuento, shures:\n";
+        $out .= sprintf "Os cuento, shures:\n";
         my $position = 1;
         my @shures;
         foreach my $shur (values %{chat_members($tg_chat_id)}) {
             push @shures, {username => $shur->{'username'},
                            data => tg_id_dumps($shur->{'id'})};
         }
-        my $graph = gen_graph(map { $_->{points} } @shures);
+        $graph_b64 = gen_graph(map { {$_->{username} => $_->{data}{points}} } @shures);
         foreach my $shur (sort { $b->{data}{month} <=> $a->{data}{month} } @shures) {
-            printf "%d - @%s ha cagado %d veces este mes, y %d al año.\n",
+            $out .= sprintf "%d - @%s ha cagado %d veces este mes, y %d al año.\n",
                 $position++, $shur->{username}, $shur->{data}{month}, $shur->{data}{year};
         }
     }
+    print encode_json({type => 'PHOTO', caption => $out,
+                       content => $graph_b64,
+                       filename => 'graph.png'});
 }
 
 sub gen_graph {
     my $points = shift;
+    my (undef, undef, undef, $day, $month, $year) = localtime();
+    $month++;
+    $year += 1900;
+    my @mon_pp = qw(Enero Febrero Marzo Abril Mayo Junio Julio
+                    Agosto Septiembre Octubre Noviembre Diciembre);
+
+    my $graph = GD::Graph::lines->new(1024, 768);
+    $graph->set( line_width => 2 );
+    $graph->set(
+        x_label           => 'Dia',
+        y_label           => '# Cacas',
+        title             => "Cacas $mon_pp[$month] $year"
+        ) or die $graph->error;
+
+    my @legend;
+    my @data = [1..$day];
+    foreach my $shur (sort keys %$points) {
+        push @legend, "\@$shur";
+        my @shur_data;
+        foreach my $date (@{$points->{$shur}}) {
+            my ($y, $m, $d) = $date =~ /(\d+)-(\d+)-(\d+)/;
+            $shur_data[$d]++ if $y == $year && $m == $month;
+        }
+        push @data, [map { defined $_ ? $_ : 0 } @shur_data];
+    }
+
+    $graph->set_legend(@legend);
+    my $gd = $graph->plot(\@data)
+        or die $graph->error;
+    return encode_base64($gd->png, '');
 }
 
 sub chat_members {
@@ -87,7 +128,8 @@ sub chat_members {
 sub tg_id_dumps {
     my $tg_id = shift;
 
-    $dbh ||= DBI->connect("DBI:SQLite:dbname=escato.db", { AutoCommit => 0, RaiseError => 1 });
+    $dbh ||= DBI->connect("DBI:SQLite:dbname=escato.db",
+                         { AutoCommit => 0, RaiseError => 1 });
 
     my $sth = $dbh->prepare('SELECT date FROM monthly_dumps WHERE tg_id = ?');
     $sth->execute($tg_id);
@@ -97,7 +139,7 @@ sub tg_id_dumps {
     $month++;
     $year += 1900;
     while (my $row = $sth->fetch()) {
-        push @points, $row;
+        push @points, @$row;
         my ($date) = @$row;
         my ($y, $m, $d) = $date =~ /(\d+)-(\d+)-(\d+)/;
         $stats{total} += 1;
