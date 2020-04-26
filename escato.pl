@@ -71,7 +71,9 @@ sub show_dumps {
             push @shures, {username => $shur->{'username'},
                            data => tg_id_dumps($shur->{'id'})};
         }
-        $graph_b64 = gen_graph(map { {$_->{username} => $_->{data}{points}} } @shures);
+        my %graph_info;
+        $graph_info{$_->{username}} = $_->{data}{points} foreach (@shures);
+        $graph_b64 = gen_graph(\%graph_info);
         foreach my $shur (sort { $b->{data}{month} <=> $a->{data}{month} } @shures) {
             $out .= sprintf "%d - @%s ha cagado %d veces este mes, y %d al año.\n",
                 $position++, $shur->{username}, $shur->{data}{month}, $shur->{data}{year};
